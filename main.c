@@ -2,6 +2,38 @@
 #include <string.h>
 
 /*
+ * macro?
+ */
+int f_norm(int input, int modulus)
+{
+	while (input < 0) {
+		input += modulus;
+	}
+
+	return input % modulus;
+}
+
+/*
+ * we'll do this properly later
+ */
+int finite_inverse(int input, int modulus)
+{
+	switch (input)
+	{
+		case 1:
+			return 1;
+		case 2:
+			return 129;
+		case 255:
+			return 128;
+		case 256:
+			return 256;
+	}
+
+	return 666;
+}
+
+/*
  * from input 8-bit value, generate shares in the following scheme:
  *
  * k = 2 (implies polynomial degree 1)
@@ -26,8 +58,47 @@ void shamir_encode(char inc)
 }
 
 /*
+ * reconstruct secret from shares in above scheme.
+ * shares are read from stdin and must be entered with
+ * "(", "," and ")" characters; whitespace is ignored.
+ */
+void shamir_decode()
+{
+	int x1, y1, x2, y2, matches, y_diff, x_diff, x_co;
+	char secret;
+
+	matches = scanf(" ( %d , %d ) ( %d , %d ) ", &x1, &y1, &x2, &y2);
+	if (matches != 4) {
+		printf("bad input\n");
+		return;
+	}
+
+	if (x1 == x2 || y1 == y2){
+		printf("duplicated coordinates\n");
+		return;
+	}
+
+	/* 
+	 * we have well-defined distinct points
+	 * and 0 <= x1, x2, y1, y2 < 257
+	 *
+	 * the coefficient of x "a" in q(x) can be recovered as follows:
+	 *
+	 * (y2 - y1) * (x2 - x1)^-1 ~= a	mod 257
+	 */
+	y_diff = (257 + y2 - y1) % 257;
+	x_diff = (257 + x2 - x1) % 257;
+
+	x_co = (y_diff * finite_inverse(x_diff, 257)) % 257;
+	secret = f_norm(y1 - x_co * x1, 257);
+
+	printf("Reconstructed secret: %c\n", secret);
+}
+
+/*
  * - read stdin or first argument filename
  * - encode first character, if there is one
+ * - prompt for two shares to verify secret reconstruction
  */
 int main(int argc, char **argv)
 {
@@ -53,6 +124,9 @@ int main(int argc, char **argv)
 	c = getc(infile);
 	if (c != EOF)
 		shamir_encode(c);
+
+	fprintf(stderr, "Reenter two shares to validate:\n");
+	shamir_decode();
 
 	return 0;
 }
