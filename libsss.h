@@ -1,0 +1,4 @@
+int f_norm(int input, int modulus);
+int finite_inverse(int input, int modulus);
+int sss_enc(char *infilename, char *outdirname);
+int sss_dec(char *s1, char *s2);
