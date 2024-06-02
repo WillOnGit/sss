@@ -1,58 +1,32 @@
+#define	SBUF_SIZE	32
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <gmp.h>
+
 #include "libsss.h"
 
 /*
- * macro?
- */
-int f_norm(int input, int modulus)
-{
-	while (input < 0) {
-		input += modulus;
-	}
-
-	return input % modulus;
-}
-
-/*
- * we'll do this properly later
- */
-int finite_inverse(int input, int modulus)
-{
-	switch (input)
-	{
-		case 1:
-			return 1;
-		case 2:
-			return 129;
-		case 255:
-			return 128;
-		case 256:
-			return 256;
-	}
-
-	return 666;
-}
-
-/*
- * from input 8-bit value, generate shares in the following scheme:
+ * from input 256-bit value, generate shares in the following scheme:
  *
  * k = 2 (implies polynomial degree 1)
  * n = 3
  *
- * prime p = 257
+ * prime p = 115792089237316195423570985008687907853269984665640564039457584007913129640233
  * q(x) = secret + 57x
  *
  * yes, there are many deficiencies here, this is to get started.
  */
 int sss_enc(char* infilename, char* outdirname)
 {
-	int sp, y1, y2, y3, p, inc;
-	FILE *outfiles[3];
 	FILE *infile;
+	FILE *outfiles[3];
 	char *outfilename;
+	char sbuf[SBUF_SIZE] = { 0 };
+	int sp, c;
+	mpz_t y1, y2, y3, p, secret;
 
 	/* next step */
 	if (!strcmp(infilename, "-")) {
@@ -94,16 +68,30 @@ int sss_enc(char* infilename, char* outdirname)
 	}
 
 	/* actually do the thing */
-	inc = getc(infile);
-	p = 257;
+	mpz_inits(y1, y2, y3, secret, NULL);
+	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 
-	y1 = (inc + 57 * 1) % p;
-	y2 = (inc + 57 * 2) % p;
-	y3 = (inc + 57 * 3) % p;
+	for (int i = 0; i < SBUF_SIZE; i++) {
+		c = getc(infile);
+		if (c == EOF)
+			break;
+		sbuf[i] = c;
+	}
 
-	fprintf(outfiles[0], "(1, %d)\n", y1);
-	fprintf(outfiles[1], "(2, %d)\n", y2);
-	fprintf(outfiles[2], "(3, %d)\n", y3);
+	/* 0 <= secret < p */
+	mpz_import(secret, SBUF_SIZE, -1, sizeof(char), 0, 0, sbuf);
+
+	/* arithmetic */
+	mpz_add_ui(y1, secret, 57 * 1);
+	mpz_mod(y1, y1, p);
+	mpz_add_ui(y2, secret, 57 * 2);
+	mpz_mod(y2, y2, p);
+	mpz_add_ui(y3, secret, 57 * 3);
+	mpz_mod(y3, y3, p);
+
+	gmp_fprintf(outfiles[0], "(1, %Zd)\n", y1);
+	gmp_fprintf(outfiles[1], "(2, %Zd)\n", y2);
+	gmp_fprintf(outfiles[2], "(3, %Zd)\n", y3);
 
 	return 0;
 }
@@ -115,9 +103,10 @@ int sss_enc(char* infilename, char* outdirname)
  */
 int sss_dec(char *f1, char *f2)
 {
-	int x1, y1, x2, y2, matches, y_diff, x_diff, x_co;
-	char secret;
 	FILE *s1, *s2;
+	char sbuf[SBUF_SIZE] = { 0 };
+	int matches;
+	mpz_t x1, x2, y1, y2, x_diff, y_diff, p;
 
 	s1 = fopen(f1, "r");
 	s2 = fopen(f2, "r");
@@ -130,38 +119,47 @@ int sss_dec(char *f1, char *f2)
 		return 1;
 	}
 
-	matches = fscanf(s1, " ( %d , %d ) ", &x1, &y1);
+	mpz_inits(x1, x2, y1, y2, x_diff, y_diff, NULL);
+	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
+
+	matches = gmp_fscanf(s1, " ( %Zd , %Zd ) ", &x1, &y1);
 	if (matches != 2) {
-		printf("bad input in %s\n", f1);
-		return 0;
+		printf("Bad input in %s\n", f1);
+		return 1;
 	}
 
-	matches = fscanf(s2, " ( %d , %d ) ", &x2, &y2);
+	matches = gmp_fscanf(s2, " ( %Zd , %Zd ) ", &x2, &y2);
 	if (matches != 2) {
-		printf("bad input in %s\n", f2);
-		return 0;
+		printf("Bad input in %s\n", f2);
+		return 1;
 	}
 
-	if (x1 == x2 || y1 == y2){
-		printf("duplicated coordinates\n");
-		return 0;
+	if (! (mpz_cmp(x1, x2) && mpz_cmp(y1, y2)) ){
+		printf("Duplicated coordinates\n");
+		return 1;
 	}
 
 	/*
 	 * we have well-defined distinct points
-	 * and 0 <= x1, x2, y1, y2 < 257
+	 * and 0 <= x1, x2, y1, y2 < p
 	 *
 	 * the coefficient of x "a" in q(x) can be recovered as follows:
 	 *
-	 * (y2 - y1) * (x2 - x1)^-1 ~= a	mod 257
+	 * (y2 - y1) * (x2 - x1)^-1 ~= a	mod p
 	 */
-	y_diff = (257 + y2 - y1) % 257;
-	x_diff = (257 + x2 - x1) % 257;
+	mpz_sub(y_diff, y2, y1);
+	mpz_sub(x_diff, x2, x1);
 
-	x_co = (y_diff * finite_inverse(x_diff, 257)) % 257;
-	secret = f_norm(y1 - x_co * x1, 257);
+	mpz_invert(x_diff, x_diff, p);
+	mpz_mul(y_diff, y_diff, x_diff);
 
-	printf("Reconstructed secret: %c\n", secret);
+	mpz_submul(y1, x1, y_diff);
+	mpz_mod(y1, y1, p);
+
+	mpz_export(sbuf, NULL, -1, sizeof(char), 0, 0, y1);
+
+	for (int i = 0; i < SBUF_SIZE; i++)
+		putchar(sbuf[i]);
 
 	return 0;
 }
