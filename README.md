@@ -26,3 +26,4 @@ to recover the secret character.
 
 ## Dependencies
 * [The GNU Multiple Precision Arithmetic Library](https://gmplib.org/)
+* `xxd` for tests only
