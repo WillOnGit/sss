@@ -6,7 +6,8 @@ Toy implementation of Shamir's Secret Sharing.
 make
 ./sss output_directory
 ```
-One character will be read from stdin. You can read from a file instead with
+Up to 32 characters (ASCII only) will be read from stdin.
+You can read from a file instead with
 
 ```
 ./sss infile output_directory
@@ -17,11 +18,10 @@ Use:
 ```
 ./sss -d output_directory/shareX output_directory/shareY
 ```
-to recover the secret character.
+to recover the secret.
 
 ## Current limitations
 * k=2, n=3 is the only scheme currently supported
-* polynomial coefficients are not random, so a secret can be recovered from a single share
 * secrets must be 32 bytes/256 bits
 
 ## Dependencies

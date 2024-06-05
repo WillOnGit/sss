@@ -9,6 +9,64 @@
 #include "libsss.h"
 
 /*
+ * return a global random state, initialising it from /dev/urandom if
+ * necessary
+ */
+gmp_randstate_t *getstate()
+{
+	static gmp_randstate_t state;
+	static int init = 0;
+
+	unsigned int seed = 0;
+
+	if (!init) {
+		gmp_randinit_default(state);
+
+		/* try to get random bytes for seed */
+		FILE *urandom = fopen("/dev/urandom", "r");
+
+		if (urandom == NULL) {
+			fprintf(stderr, "Can't open /dev/urandom!\nOutput shares will be unsafe.\n");
+		} else {
+			/*
+			 * TODO: improve this random seeding
+			 *
+			 * This is just a project for fun so this will do for now
+			 * but it would be interesting to revisit this.
+			 *
+			 * For instance, since sizeof(unsigned int) on this machine
+			 * is 4, if I understand correctly there are only 2^32
+			 * coefficients possible for this to generate (while we only
+			 * generate one number, the coefficient a1), which is
+			 * probably "easily" brute-forced.
+			 *
+			 * As far as I can tell the only alternative to seeding with
+			 * an unsigned int is to seed with an mpz_t. But if you're
+			 * already constructing an mpz_t from random bytes
+			 * anyway, why not just directly create all your random
+			 * numbers that way too?
+			 *
+			 * I guess it only makes a difference in future when we
+			 * generate lots more numbers, so we save lots of reads.
+			 * Maybe a cryptographer can weigh in on the pros and cons.
+			 */
+			for (int i = 0; i < sizeof(unsigned int); i++) {
+				seed += getc(urandom) << (8 * i);
+			}
+		}
+		fclose(urandom);
+
+		/* ready to finish */
+		gmp_randseed_ui(state, seed);
+		init = 1;
+		return &state;
+	} else {
+		/* random state already initialised */
+		return &state;
+	}
+}
+
+/*
  * from input 256-bit value, generate shares in the following scheme:
  *
  * k = 2 (implies polynomial degree 1)
@@ -26,7 +84,7 @@ int sss_enc(char* infilename, char* outdirname)
 	char *outfilename;
 	char sbuf[SBUF_SIZE] = { 0 };
 	int sp, c;
-	mpz_t y1, y2, y3, p, secret;
+	mpz_t a1, y1, y2, y3, p, secret;
 
 	/* next step */
 	if (!strcmp(infilename, "-")) {
@@ -68,7 +126,7 @@ int sss_enc(char* infilename, char* outdirname)
 	}
 
 	/* actually do the thing */
-	mpz_inits(y1, y2, y3, secret, NULL);
+	mpz_inits(a1, secret, NULL);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 
 	for (int i = 0; i < SBUF_SIZE; i++) {
@@ -78,15 +136,22 @@ int sss_enc(char* infilename, char* outdirname)
 		sbuf[i] = c;
 	}
 
+	/* generate coefficient */
+	mpz_urandomm(a1, *getstate(), p);
+
 	/* 0 <= secret < p */
 	mpz_import(secret, SBUF_SIZE, -1, sizeof(char), 0, 0, sbuf);
 
 	/* arithmetic */
-	mpz_add_ui(y1, secret, 57 * 1);
+	mpz_init_set(y1, secret);
+	mpz_init_set(y2, secret);
+	mpz_init_set(y3, secret);
+
+	mpz_addmul_ui(y1, a1, 1);
 	mpz_mod(y1, y1, p);
-	mpz_add_ui(y2, secret, 57 * 2);
+	mpz_addmul_ui(y2, a1, 2);
 	mpz_mod(y2, y2, p);
-	mpz_add_ui(y3, secret, 57 * 3);
+	mpz_addmul_ui(y3, a1, 3);
 	mpz_mod(y3, y3, p);
 
 	gmp_fprintf(outfiles[0], "(1, %Zd)\n", y1);
