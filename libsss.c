@@ -73,7 +73,7 @@ gmp_randstate_t *getstate()
  * n = 3
  *
  * prime p = 115792089237316195423570985008687907853269984665640564039457584007913129640233
- * q(x) = secret + 57x
+ * q(x) = secret + a1 * x
  *
  * yes, there are many deficiencies here, this is to get started.
  */
