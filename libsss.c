@@ -1,4 +1,7 @@
 #define	SBUF_SIZE	32
+#define	LIBSSS_VERSION	"0.1dev"
+#define	X_STR(x)	#x
+#define	STR(x)	X_STR(x)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +10,15 @@
 #include <gmp.h>
 
 #include "libsss.h"
+
+const char * const sss_libver = LIBSSS_VERSION
+	"\ngmp version: "
+	STR(__GNU_MP_VERSION)
+	"."
+	STR(__GNU_MP_VERSION_MINOR)
+	"."
+	STR(__GNU_MP_VERSION_PATCHLEVEL)
+	;
 
 /*
  * return a global random state, initialising it from /dev/urandom if

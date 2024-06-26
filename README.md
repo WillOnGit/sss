@@ -4,21 +4,25 @@ Toy implementation of Shamir's Secret Sharing.
 ## Quickstart
 ```
 make
-./sss output_directory
+./sss
 ```
-Up to 32 characters (ASCII only) will be read from stdin.
+
+Up to 32 characters (ASCII) will be read from stdin.
+Three shares will be generated in the current directory named `share1`, `share2` and `share3`.
+
 You can read from a file instead with
+```
+./sss infile optional_directory
+```
 
-```
-./sss infile output_directory
-```
-Shares will be generated in the output directory.
-Use:
+If you specify `optional_directory` then shares will be placed there instead of the current directory.
 
+To recover the secret use
 ```
-./sss -d output_directory/shareX output_directory/shareY
+./sss -d shareX shareY
 ```
-to recover the secret.
+
+or just `./sss -d` if `share1` and `share2` are present in the current directory.
 
 ## Current limitations
 * k=2, n=3 is the only scheme currently supported
