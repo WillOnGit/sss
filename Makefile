@@ -1,10 +1,10 @@
 .PHONY: test clean
 .SILENT: test
 
-sss: sss.c libsss.c
+sss: sss.c libsss.c libsss.h
 	cc -O2 -Wall -Werror -Werror=implicit -std=gnu11 -lgmp -o sss sss.c libsss.c
 
-debug: sss.c libsss.c
+debug: sss.c libsss.c libsss.h
 	cc -O0 -Wall -Werror -Werror=implicit -std=gnu11 -lgmp -g -o debug sss.c libsss.c
 
 test: sss
