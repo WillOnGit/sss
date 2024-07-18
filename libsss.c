@@ -169,16 +169,23 @@ struct sss_share *sss_des(FILE *f)
  */
 int sss_enc(const char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3)
 {
+	gmp_randstate_t *state;
 	mpz_t a1, p, secret;
 	struct sss_share s1, s2, s3;
 
 	/* init */
-	mpz_inits(a1, secret, NULL);
+	mpz_inits(a1, secret, s1.x, s2.x, s3.x, NULL);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
+	state = getstate();
 
-	mpz_init_set_ui(s1.x, 1);
-	mpz_init_set_ui(s2.x, 2);
-	mpz_init_set_ui(s3.x, 3);
+	/*
+	 * TODO: yes, this could result in some duplicate x coordinates
+	 * but the chance is so vanishingly small it really doesn't feel
+	 * worth it yet.
+	 */
+	mpz_urandomm(s1.x, *state, p);
+	mpz_urandomm(s2.x, *state, p);
+	mpz_urandomm(s3.x, *state, p);
 
 	/* 0 <= secret < p */
 	mpz_import(secret, SBUF_SIZE, -1, sizeof(char), 0, 0, inbuf);
