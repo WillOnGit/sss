@@ -1,6 +1,8 @@
+#define	SBUF_SIZE	32
 #define	SSS_VERSION	"0.1dev"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "libsss.h"
@@ -21,12 +23,13 @@ const char * const sss_version = SSS_VERSION;
 int main(int argc, char **argv)
 {
 	int enc, dec;
-	char *f1, *f2;
+	char *n1, *n2;
+	char sbuf[SBUF_SIZE] = { 0 };
 
 	enc = 1;
 	dec = 0;
 
-	f1 = f2 = NULL;
+	n1 = n2 = NULL;
 
 	/*
 	 * handle arguments
@@ -52,36 +55,121 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		/* pick up anything else as a file/directory argument, ignoring if 2 */
-		if (f1 == NULL) {
-			f1 = argv[i];
-		} else if (f2 == NULL) {
-			f2 = argv[i];
+		/* pick up anything else as a file/directory argument, ignoring any beyond the first 2 */
+		if (n1 == NULL) {
+			n1 = argv[i];
+		} else if (n2 == NULL) {
+			n2 = argv[i];
 		}
 	}
 
 	/* options parsed, call relevant lib function */
 	if (enc) {
-		/* set defaults if not specified */
-		if (f1 == NULL) {
-			/* f2 will also be NULL if f1 is */
-			return sss_enc("-", "./");
-		} else if (f2 == NULL) {
-			return sss_enc(f1, "./");
-		} else {
-			return sss_enc(f1, f2);
+		int c, sp;
+		char *outf;
+
+		/* set defaults if not specified or check for empty strings */
+		if (n1 == NULL) {
+			n1 = "-";
+		} else if (!strcmp(n1, "")) {
+			fprintf(stderr, "Please supply a nonempty input filename\n");
+			return 1;
 		}
+
+		if (n2 == NULL) {
+			n2 = "./";
+		} else if (!strcmp(n2, "")) {
+			fprintf(stderr, "Please supply a nonempty directory name\n");
+			return 1;
+		}
+
+		/* open files */
+		FILE *infile, *sf1, *sf2, *sf3;
+
+		if (!strcmp(n1, "-")) {
+			infile = stdin;
+		} else {
+			infile = fopen(n1, "r");
+			if (infile == NULL) {
+				fprintf(stderr, "Unable to open file %s\n", n1);
+				return 1;
+			}
+		}
+
+		/* construct share filenames */
+		sp = strlen(n2);
+		outf = malloc(sp + 8);
+		if (outf == NULL)
+			return 1;
+
+		memcpy(outf, n2, sp * sizeof(char));
+		if (outf[sp - 1] != '/') {
+			outf[sp-1] = '/';
+			sp++;
+		}
+
+		strcpy(&outf[sp], "share0");
+		sp += 6;
+		outf[sp] = '\0';
+
+		/* start */
+		outf[sp - 1] = '1';
+		sf1 = fopen(outf, "w");
+		outf[sp - 1] = '2';
+		sf2 = fopen(outf, "w");
+		outf[sp - 1] = '3';
+		sf3 = fopen(outf, "w");
+
+		if (sf1 == NULL || sf2 == NULL || sf3 == NULL) {
+			fprintf(stderr, "Unable to open some files\n");
+			return 1;
+		}
+
+		/* fill the buffer and create shares */
+		for (int i = 0; i < SBUF_SIZE; i++) {
+			c = getc(infile);
+			if (c == EOF)
+				break;
+			sbuf[i] = c;
+		}
+
+		return sss_enc(sbuf, sf1, sf2, sf3);
 	} else if (dec) {
+		int result;
+
 		/* set defaults only if nothing specified */
-		if (f1 == NULL && f2 == NULL) {
-			f1 = "share1";
-			f2 = "share2";
-		} else if (f1 == NULL || f2 == NULL) {
+		if (n1 == NULL && n2 == NULL) {
+			n1 = "share1";
+			n2 = "share2";
+		} else if (n1 == NULL || n2 == NULL) {
 		    fprintf(stderr, "Please supply two shares\n");
 		    return 1;
 		}
 
-		return sss_dec(f1, f2);
+		FILE *sf1, *sf2;
+
+		sf1 = fopen(n1, "r");
+		sf2 = fopen(n2, "r");
+
+		if (sf1 == NULL || sf2 == NULL) {
+			fprintf(stderr, "Unable to open some files\n");
+			return 1;
+		}
+
+		result = sss_dec(sbuf, sf1, sf2);
+
+		switch (result) {
+		case 0:
+			for (int i = 0; i < SBUF_SIZE; i++)
+				putchar(sbuf[i]);
+			return 0;
+		case 1:
+			printf("Bad input share\n");
+			return 1;
+		case 2:
+			printf("Duplicated coordinates\n");
+			return 1;
+		}
 	}
 
 	/* shouldn't happen */

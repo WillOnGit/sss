@@ -5,7 +5,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include <gmp.h>
 
@@ -19,6 +18,12 @@ const char * const sss_libver = LIBSSS_VERSION
 	"."
 	STR(__GNU_MP_VERSION_PATCHLEVEL)
 	;
+
+struct sss_share
+{
+	mpz_t x;
+	mpz_t y;
+};
 
 /*
  * return a global random state, initialising it from /dev/urandom if
@@ -79,6 +84,79 @@ gmp_randstate_t *getstate()
 }
 
 /*
+ * serialise a share to a file, no NULL check
+ */
+int sss_ser(const struct sss_share *s, FILE *f)
+{
+	char xbytes[SBUF_SIZE] = {0};
+	char ybytes[SBUF_SIZE] = {0};
+
+	/*
+	 * TODO: bounds checking
+	 *
+	 * If I understand correctly no more than 32 bytes should ever
+	 * be written to either of these arrays as it stands, since the
+	 * maximum values are constrained by design to be <=32-byte
+	 * numbers. So this should be fine for now.
+	 *
+	 * It's probably still a good idea to add bounds checking
+	 * though, as we'll inevitably end up increasing the buffer size
+	 * and causing a segfault at some point in the future.
+	 */
+	mpz_export(xbytes, NULL, -1, sizeof(char), 0, 0, s->x);
+	mpz_export(ybytes, NULL, -1, sizeof(char), 0, 0, s->y);
+
+	/*
+	 * - magic bytes b6 94
+	 * - serialisation format version
+	 * - exactly 32 (SBUF_SIZE) bytes for x
+	 * - exactly 32 (SBUF_SIZE) bytes for y
+	 */
+	fprintf(f, "\xb6\x94\x01");
+	fwrite(xbytes, sizeof(char), SBUF_SIZE, f);
+	fwrite(ybytes, sizeof(char), SBUF_SIZE, f);
+
+	return 0;
+}
+
+/*
+ * deserialise a share from a file, no NULL check
+ */
+struct sss_share *sss_des(FILE *f)
+{
+	int c;
+	static char inbuf[67];
+	struct sss_share *newshare;
+
+	/* copy everything to inbuf and exit if error */
+	for (int i = 0; i < 67; i++) {
+		c = getc(f);
+		if (c == EOF)
+			return NULL;
+
+		inbuf[i] = c;
+	}
+
+	/* check magic */
+	if (inbuf[0] != '\xb6' || inbuf[1] != '\x94')
+		return NULL;
+
+	/* check version */
+	if (inbuf[2] != '\x01')
+		return NULL;
+
+	newshare = malloc(sizeof(struct sss_share));
+	if (newshare == NULL)
+		return NULL;
+
+	mpz_inits(newshare->x, newshare->y, NULL);
+	mpz_import(newshare->x, SBUF_SIZE, -1, sizeof(char), 0, 0, &inbuf[3]);
+	mpz_import(newshare->y, SBUF_SIZE, -1, sizeof(char), 0, 0, &inbuf[35]);
+
+	return newshare;
+}
+
+/*
  * from input 256-bit value, generate shares in the following scheme:
  *
  * k = 2 (implies polynomial degree 1)
@@ -89,87 +167,42 @@ gmp_randstate_t *getstate()
  *
  * yes, there are many deficiencies here, this is to get started.
  */
-int sss_enc(char* infilename, char* outdirname)
+int sss_enc(const char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3)
 {
-	FILE *infile;
-	FILE *outfiles[3];
-	char *outfilename;
-	char sbuf[SBUF_SIZE] = { 0 };
-	int sp, c;
-	mpz_t a1, y1, y2, y3, p, secret;
+	mpz_t a1, p, secret;
+	struct sss_share s1, s2, s3;
 
-	/* next step */
-	if (!strcmp(infilename, "-")) {
-		infile = stdin;
-	} else {
-		infile = fopen(infilename, "r");
-		if (!infile) {
-			fprintf(stderr, "Unable to open file %s\n", infilename);
-			return 1;
-		}
-	}
-
-	/* outfiles will be share1, share2, etc. */
-	sp = strlen(outdirname);
-	outfilename = malloc(sp + 8);
-	if (outfilename == NULL)
-		return 1;
-
-	memcpy(outfilename, outdirname, sp);
-
-	/* add / if required */
-	if (outfilename[sp - 1] != '/') {
-		outfilename[sp++] = '/';
-	}
-
-	/* there must be a better way to do this? */
-	outfilename[sp++] = 's';
-	outfilename[sp++] = 'h';
-	outfilename[sp++] = 'a';
-	outfilename[sp++] = 'r';
-	outfilename[sp++] = 'e';
-	outfilename[sp+1] = '\0';
-
-	for (int i = 0; i < 3; i++) {
-		outfilename[sp] = '1' + i;
-		outfiles[i] = fopen(outfilename, "w");
-		if (outfiles[i] == NULL)
-			return 1;
-	}
-
-	/* actually do the thing */
+	/* init */
 	mpz_inits(a1, secret, NULL);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 
-	for (int i = 0; i < SBUF_SIZE; i++) {
-		c = getc(infile);
-		if (c == EOF)
-			break;
-		sbuf[i] = c;
-	}
+	mpz_init_set_ui(s1.x, 1);
+	mpz_init_set_ui(s2.x, 2);
+	mpz_init_set_ui(s3.x, 3);
+
+	/* 0 <= secret < p */
+	mpz_import(secret, SBUF_SIZE, -1, sizeof(char), 0, 0, inbuf);
 
 	/* generate coefficient */
 	mpz_urandomm(a1, *getstate(), p);
 
-	/* 0 <= secret < p */
-	mpz_import(secret, SBUF_SIZE, -1, sizeof(char), 0, 0, sbuf);
-
 	/* arithmetic */
-	mpz_init_set(y1, secret);
-	mpz_init_set(y2, secret);
-	mpz_init_set(y3, secret);
+	mpz_init_set(s1.y, secret);
+	mpz_init_set(s2.y, secret);
+	mpz_init_set(s3.y, secret);
 
-	mpz_addmul_ui(y1, a1, 1);
-	mpz_mod(y1, y1, p);
-	mpz_addmul_ui(y2, a1, 2);
-	mpz_mod(y2, y2, p);
-	mpz_addmul_ui(y3, a1, 3);
-	mpz_mod(y3, y3, p);
+	mpz_addmul(s1.y, a1, s1.x);
+	mpz_mod(s1.y, s1.y, p);
+	mpz_addmul(s2.y, a1, s2.x);
+	mpz_mod(s2.y, s2.y, p);
+	mpz_addmul(s3.y, a1, s3.x);
+	mpz_mod(s3.y, s3.y, p);
 
-	gmp_fprintf(outfiles[0], "(1, %Zd)\n", y1);
-	gmp_fprintf(outfiles[1], "(2, %Zd)\n", y2);
-	gmp_fprintf(outfiles[2], "(3, %Zd)\n", y3);
-
+	/* write shares and return */
+	sss_ser(&s1, sf1);
+	sss_ser(&s2, sf2);
+	sss_ser(&s3, sf3);
+	
 	return 0;
 }
 
@@ -177,43 +210,29 @@ int sss_enc(char* infilename, char* outdirname)
  * reconstruct secret from shares in above scheme.
  * shares are read from files and must be entered with
  * "(", "," and ")" characters; whitespace is ignored.
+ *
+ * return codes:
+ *     - 0: success
+ *     - 1: corrupt input share
+ *     - 2: duplicated shares/x coordinates
  */
-int sss_dec(char *f1, char *f2)
+int sss_dec(char * inbuf, FILE *s1, FILE *s2)
 {
-	FILE *s1, *s2;
-	char sbuf[SBUF_SIZE] = { 0 };
-	int matches;
-	mpz_t x1, x2, y1, y2, x_diff, y_diff, p;
+	struct sss_share *share1, *share2;
+	mpz_t x_diff, y_diff, p;
 
-	s1 = fopen(f1, "r");
-	s2 = fopen(f2, "r");
-	if (s1 == NULL) {
-		fprintf(stderr, "Unable to open file %s\n", f1);
-		return 1;
-	}
-	if (s2 == NULL) {
-		fprintf(stderr, "Unable to open file %s\n", f2);
+	share1 = sss_des(s1);
+	share2 = sss_des(s2);
+
+	if (share1 == NULL || share2 == NULL) {
 		return 1;
 	}
 
-	mpz_inits(x1, x2, y1, y2, x_diff, y_diff, NULL);
+	mpz_inits(x_diff, y_diff, NULL);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 
-	matches = gmp_fscanf(s1, " ( %Zd , %Zd ) ", &x1, &y1);
-	if (matches != 2) {
-		printf("Bad input in %s\n", f1);
-		return 1;
-	}
-
-	matches = gmp_fscanf(s2, " ( %Zd , %Zd ) ", &x2, &y2);
-	if (matches != 2) {
-		printf("Bad input in %s\n", f2);
-		return 1;
-	}
-
-	if (! (mpz_cmp(x1, x2) && mpz_cmp(y1, y2)) ){
-		printf("Duplicated coordinates\n");
-		return 1;
+	if (! (mpz_cmp(share1->x, share2->x) && mpz_cmp(share1->y, share2->y)) ){
+		return 2;
 	}
 
 	/*
@@ -224,19 +243,17 @@ int sss_dec(char *f1, char *f2)
 	 *
 	 * (y2 - y1) * (x2 - x1)^-1 ~= a	mod p
 	 */
-	mpz_sub(y_diff, y2, y1);
-	mpz_sub(x_diff, x2, x1);
+	mpz_sub(y_diff, share2->y, share1->y);
+	mpz_sub(x_diff, share2->x, share1->x);
 
 	mpz_invert(x_diff, x_diff, p);
-	mpz_mul(y_diff, y_diff, x_diff);
+	mpz_mul(y_diff, y_diff, x_diff);/* y_diff = a1 */
 
-	mpz_submul(y1, x1, y_diff);
-	mpz_mod(y1, y1, p);
+	mpz_set(x_diff, share1->y);
+	mpz_submul(x_diff, share1->x, y_diff);
+	mpz_mod(x_diff, x_diff, p);
 
-	mpz_export(sbuf, NULL, -1, sizeof(char), 0, 0, y1);
-
-	for (int i = 0; i < SBUF_SIZE; i++)
-		putchar(sbuf[i]);
+	mpz_export(inbuf, NULL, -1, sizeof(char), 0, 0, x_diff);
 
 	return 0;
 }
