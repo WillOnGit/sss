@@ -104,8 +104,7 @@ int main(int argc, char **argv)
 
 		memcpy(outf, n2, sp * sizeof(char));
 		if (outf[sp - 1] != '/') {
-			outf[sp-1] = '/';
-			sp++;
+			outf[sp++] = '/';
 		}
 
 		strcpy(&outf[sp], "share0");

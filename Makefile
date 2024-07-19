@@ -53,6 +53,8 @@ test: sss
 	./sss -d
 	echo "hello7" | ./sss - ./ --encode
 	./sss share1 share2 -d
+	echo "hello8" | ./sss - . --encode
+	./sss share1 share2 -d
 
 clean:
 	rm -rf sss debug debug.dSYM/ share{1,2,3}
