@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 {
 	int enc, dec;
 	char *n1, *n2;
-	char sbuf[SBUF_SIZE] = { 0 };
+	signed char sbuf[SBUF_SIZE] = { 0 };
 
 	enc = 1;
 	dec = 0;

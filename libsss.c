@@ -88,8 +88,8 @@ gmp_randstate_t *getstate()
  */
 int sss_ser(const struct sss_share *s, FILE *f)
 {
-	char xbytes[SBUF_SIZE] = {0};
-	char ybytes[SBUF_SIZE] = {0};
+	signed char xbytes[SBUF_SIZE] = {0};
+	signed char ybytes[SBUF_SIZE] = {0};
 
 	/*
 	 * TODO: bounds checking
@@ -125,7 +125,7 @@ int sss_ser(const struct sss_share *s, FILE *f)
 struct sss_share *sss_des(FILE *f)
 {
 	int c;
-	static char inbuf[67];
+	static signed char inbuf[67];
 	struct sss_share *newshare;
 
 	/* copy everything to inbuf and exit if error */
@@ -167,7 +167,7 @@ struct sss_share *sss_des(FILE *f)
  *
  * yes, there are many deficiencies here, this is to get started.
  */
-int sss_enc(const char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3)
+int sss_enc(const signed char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3)
 {
 	gmp_randstate_t *state;
 	mpz_t a1, p, secret;
@@ -223,7 +223,7 @@ int sss_enc(const char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3)
  *     - 1: corrupt input share
  *     - 2: duplicated shares/x coordinates
  */
-int sss_dec(char * inbuf, FILE *s1, FILE *s2)
+int sss_dec(signed char * inbuf, FILE *s1, FILE *s2)
 {
 	struct sss_share *share1, *share2;
 	mpz_t x_diff, y_diff, p;
