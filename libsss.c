@@ -223,13 +223,13 @@ int sss_enc(const signed char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3)
  *     - 1: corrupt input share
  *     - 2: duplicated shares/x coordinates
  */
-int sss_dec(signed char * inbuf, FILE *s1, FILE *s2)
+int sss_dec(signed char * inbuf, FILE *sf1, FILE *sf2)
 {
 	struct sss_share *share1, *share2;
 	mpz_t x_diff, y_diff, p;
 
-	share1 = sss_des(s1);
-	share2 = sss_des(s2);
+	share1 = sss_des(sf1);
+	share2 = sss_des(sf2);
 
 	if (share1 == NULL || share2 == NULL) {
 		return 1;
