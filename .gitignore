@@ -2,3 +2,4 @@
 /share*
 /sss
 /debug.dSYM/
+*.o
