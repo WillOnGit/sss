@@ -24,6 +24,13 @@ To recover the secret use
 
 or just `./sss -d` if `share1` and `share2` are present in the current directory.
 
+Run
+```
+./sss -h
+```
+
+for more info.
+
 ## Current limitations
 * k=2, n=3 is the only scheme currently supported
 * secrets must be 32 bytes/256 bits

@@ -8,6 +8,29 @@
 #include "libsss.h"
 
 const char * const sss_version = SSS_VERSION;
+const char * const helptext =
+	"sss - shamir's secret sharing with libsss (by WillOnGit)\n"
+	"\n"
+	"Usage: sss [--encode | -e] [in filename] [out directory]\n"
+	"or:    sss [--decode | -d] [sharefile1 sharefile2]\n"
+	"or:    sss [--version | -v]\n"
+	"or:    sss [--help | -h]\n"
+	"\n"
+	"If none of [--encode | -e] or [--decode | -d] are specified, encoding is\n"
+	"the default operation.\n"
+	"\n"
+	"When encoding shares, the input file defaults to stdin and the out\n"
+	"directory defaults to the working directory. Three shares will be\n"
+	"written to out directory, named share1, share2 and share3.\n"
+	"\n"
+	"When decoding from shares, if no filenames are supplied they will\n"
+	"default to share1 and share2. Supplying only one filename is an error.\n"
+	"Output is to stdout.\n"
+	"\n"
+	"[--version | -v] prints the program and library versions then exits.\n"
+	"\n"
+	"[--help | -h] prints this message then exits.\n"
+	;
 
 /*
  * basic wrapper around libsss encoding & decoding
@@ -40,6 +63,12 @@ int main(int argc, char **argv)
 		if (!strcmp("-v", argv[i]) || !strcmp("--version", argv[i])) {
 			/* emit version info and exit immediately */
 			printf("sss version: %s\nlibsss version: %s\n", sss_version, sss_libver);
+			return 0;
+		}
+
+		if (!strcmp("-h", argv[i]) || !strcmp("--help", argv[i])) {
+			/* emit help text and exit immediately */
+			printf("%s", helptext);
 			return 0;
 		}
 
