@@ -1,12 +1,29 @@
 .PHONY: test clean
-.SILENT: test
+.SILENT: test lastflags
 
-sss: sss.c libsss.c libsss.h
-	cc -O2 -Wall -Werror -Werror=implicit -std=gnu11 -lgmp -o sss sss.c libsss.c
+# building
+# vars
+CFLAGS = -Wall -Werror -Werror=implicit -std=gnu11
+LDLIBS = -lgmp
+OBJECTS = sss.o libsss.o
 
-debug: sss.c libsss.c libsss.h
-	cc -O0 -Wall -Werror -Werror=implicit -std=gnu11 -lgmp -g -o debug sss.c libsss.c
+# targets
+all: release
 
+release: CFLAGS += -O2
+release: lastflags sss
+
+debug: CFLAGS += -O0 -g
+debug: lastflags sss
+
+sss: $(OBJECTS)
+
+lastflags:
+	touch .flags
+	if [[ $$(cat .flags) != "$(CFLAGS)" ]]; then echo "rebuilding object files"; rm -f $(OBJECTS); fi
+	echo "$(CFLAGS)" > .flags
+
+# phony
 test: sss
 	echo "testing the string input \"testing\""
 	echo "testing" | ./sss
@@ -57,4 +74,4 @@ test: sss
 	./sss share1 share2 -d
 
 clean:
-	rm -rf sss debug debug.dSYM/ share{1,2,3}
+	rm -rf $(OBJECTS) .flags share{1,2,3} sss sss.dSYM/

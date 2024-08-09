@@ -1,5 +1,5 @@
-/debug
+*.o
+/.flags
 /share*
 /sss
-/debug.dSYM/
-*.o
+/sss.dSYM/
