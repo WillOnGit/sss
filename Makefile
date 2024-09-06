@@ -1,29 +1,38 @@
-.PHONY: test clean
-.SILENT: test lastflags
+.PHONY: all clean debug install lastflags mac release test uninstall
+.SILENT: lastflags test
 
-# building
-# vars
+# variables
 CFLAGS = -Wall -Werror -Werror=implicit -std=gnu11
 LDLIBS = -lgmp
 OBJECTS = sss.o libsss.o
+LIBVERSION = 0.1
 
-# targets
-all: release
+# main build targets
+all: release libsss.a(libsss.o)
+mac: all libsss.dylib
 
+# build: bins
 release: CFLAGS += -O2
 release: lastflags sss
 
 debug: CFLAGS += -O0 -g
 debug: lastflags sss
 
-sss: $(OBJECTS)
-
 lastflags:
 	touch .flags
 	if [[ $$(cat .flags) != "$(CFLAGS)" ]]; then echo "rebuilding object files"; rm -f $(OBJECTS); fi
 	echo "$(CFLAGS)" > .flags
 
-# phony
+sss: $(OBJECTS)
+
+# build: libs
+libsss.a(libsss.o): libsss.o
+
+libsss.dylib: CFLAGS += -O2 -dynamiclib -current_version $(LIBVERSION) -compatibility_version $(LIBVERSION) -install_name /usr/local/lib/libsss.dylib
+libsss.dylib: libsss.c
+	$(CC) $(CFLAGS) $(LDLIBS) libsss.c -o libsss.dylib
+
+# other targets
 test: sss
 	echo "testing the string input \"testing\""
 	echo "testing" | ./sss
@@ -73,5 +82,13 @@ test: sss
 	echo "hello8" | ./sss - . --encode
 	./sss share1 share2 -d
 
+install: all
+	sudo install -C -m 0644 libsss.a /usr/local/lib/
+	sudo install -C -m 0755 sss /usr/local/bin/
+	if [[ -f libsss.dylib ]]; then sudo install -C -m 0755 libsss.dylib /usr/local/lib/; fi;
+
+uninstall:
+	sudo rm -f /usr/local/lib/libsss.a /usr/local/lib/libsss.dylib /usr/local/bin/sss
+
 clean:
-	rm -rf $(OBJECTS) .flags share{1,2,3} sss sss.dSYM/
+	rm -rf $(OBJECTS) .flags libsss.a libsss.dylib share{1,2,3} sss sss.dSYM/

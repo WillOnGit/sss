@@ -1,5 +1,7 @@
 *.o
 /.flags
+/libsss.a
+/libsss.dylib
 /share*
 /sss
 /sss.dSYM/
