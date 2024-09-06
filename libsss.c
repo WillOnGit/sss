@@ -94,14 +94,12 @@ int sss_ser(const struct sss_share *s, FILE *f)
 	/*
 	 * TODO: bounds checking
 	 *
-	 * If I understand correctly no more than 32 bytes should ever
-	 * be written to either of these arrays as it stands, since the
-	 * maximum values are constrained by design to be <=32-byte
-	 * numbers. So this should be fine for now.
+	 * I thought 32 bytes was always sufficient because the
+	 * coordinates were bounded by 0 and 2^256-1, but actually they
+	 * are bounded by 0 and p-1, which is 2^256 + 258.
 	 *
-	 * It's probably still a good idea to add bounds checking
-	 * though, as we'll inevitably end up increasing the buffer size
-	 * and causing a segfault at some point in the future.
+	 * Like elsewhere it's hardly a critical bug but it should
+	 * really be fixed just for correctness' sake.
 	 */
 	mpz_export(xbytes, NULL, -1, sizeof(char), 0, 0, s->x);
 	mpz_export(ybytes, NULL, -1, sizeof(char), 0, 0, s->y);
