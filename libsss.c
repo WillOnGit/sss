@@ -1,5 +1,5 @@
 #define	SBUF_SIZE	32
-#define	LIBSSS_VERSION	"0.1dev"
+#define	LIBSSS_VERSION	"1.0"
 #define	X_STR(x)	#x
 #define	STR(x)	X_STR(x)
 
