@@ -10,7 +10,7 @@
 
 #include "libsss.h"
 
-const char * const sss_libver = LIBSSS_VERSION
+const char * const libsss_version = LIBSSS_VERSION
 	"\ngmp version: "
 	STR(__GNU_MP_VERSION)
 	"."

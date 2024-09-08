@@ -62,7 +62,7 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp("-v", argv[i]) || !strcmp("--version", argv[i])) {
 			/* emit version info and exit immediately */
-			printf("sss version: %s\nlibsss version: %s\n", sss_version, sss_libver);
+			printf("sss version: %s\nlibsss version: %s\n", sss_version, libsss_version);
 			return 0;
 		}
 

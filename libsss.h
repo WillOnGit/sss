@@ -1,5 +1,5 @@
 /* version number */
-const char * const sss_libver;
+const char * const libsss_version;
 
 /* data type */
 struct sss_share;
