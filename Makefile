@@ -5,7 +5,7 @@
 CFLAGS = -Wall -Werror -Werror=implicit -std=gnu11
 LDLIBS = -lgmp
 OBJECTS = sss.o libsss.o
-LIBVERSION = 0.1
+LIBVERSION = 1.1
 
 # main build targets
 all: release libsss.a(libsss.o)
