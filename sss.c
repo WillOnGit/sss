@@ -1,5 +1,5 @@
 #define	SBUF_SIZE	32
-#define	SSS_VERSION	"1.1"
+#define	SSS_VERSION	"2.0dev"
 
 #include <stdio.h>
 #include <stdlib.h>
