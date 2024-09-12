@@ -155,59 +155,55 @@ struct sss_share *sss_des(FILE *f)
 }
 
 /*
- * from input 256-bit value, generate shares in the following scheme:
- *
- * k = 2 (implies polynomial degree 1)
- * n = 3
+ * generate shares of input 256-bit secret in (2, n) scheme
  *
  * prime p = 115792089237316195423570985008687907853269984665640564039457584007913129640233
  * q(x) = secret + a1 * x
- *
- * yes, there are many deficiencies here, this is to get started.
  */
-int sss_enc(const signed char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3)
+int sss_enc(const signed char * const inbuf, int n, FILE* sf[])
 {
 	gmp_randstate_t *state;
 	mpz_t a1, p, secret;
-	struct sss_share s1, s2, s3;
+	struct sss_share *shares;
+
+	/* validation */
+	if (n < 2)
+		return 1;
 
 	/* init */
-	mpz_inits(a1, secret, s1.x, s2.x, s3.x, NULL);
+	shares = malloc(n * sizeof(struct sss_share));
+	if (shares == NULL)
+		return 1;
+
+	mpz_inits(a1, secret, NULL);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 	state = getstate();
-
-	/*
-	 * TODO: yes, this could result in some duplicate x coordinates
-	 * but the chance is so vanishingly small it really doesn't feel
-	 * worth it yet.
-	 */
-	mpz_urandomm(s1.x, *state, p);
-	mpz_urandomm(s2.x, *state, p);
-	mpz_urandomm(s3.x, *state, p);
 
 	/* 0 <= secret < p */
 	mpz_import(secret, SBUF_SIZE, -1, sizeof(char), 0, 0, inbuf);
 
 	/* generate coefficient */
-	mpz_urandomm(a1, *getstate(), p);
+	mpz_urandomm(a1, *state, p);
 
-	/* arithmetic */
-	mpz_init_set(s1.y, secret);
-	mpz_init_set(s2.y, secret);
-	mpz_init_set(s3.y, secret);
+	for (int i = 0; i < n; i++) {
+		/*
+		 * TODO: yes, this could result in some duplicate x
+		 * coordinates but the chance is so vanishingly small it
+		 * really doesn't feel worth it yet.
+		 */
+		mpz_init(shares[i].x);
+		mpz_urandomm(shares[i].x, *state, p);
 
-	mpz_addmul(s1.y, a1, s1.x);
-	mpz_mod(s1.y, s1.y, p);
-	mpz_addmul(s2.y, a1, s2.x);
-	mpz_mod(s2.y, s2.y, p);
-	mpz_addmul(s3.y, a1, s3.x);
-	mpz_mod(s3.y, s3.y, p);
+		/* calculate y coordinate */
+		mpz_init_set(shares[i].y, secret);
 
-	/* write shares and return */
-	sss_ser(&s1, sf1);
-	sss_ser(&s2, sf2);
-	sss_ser(&s3, sf3);
-	
+		mpz_addmul(shares[i].y, a1, shares[i].x);
+		mpz_mod(shares[i].y, shares[i].y, p);
+
+		/* everything was OK, so write shares and return */
+		sss_ser(&shares[i], sf[i]);
+	}
+
 	return 0;
 }
 

@@ -5,7 +5,7 @@ const char * const libsss_version;
 struct sss_share;
 
 /* encode and decode secrets <-> shares */
-int sss_enc(const signed char * const inbuf, FILE *sf1, FILE *sf2, FILE *sf3);
+int sss_enc(const signed char * const inbuf, int n, FILE* sf[]);
 int sss_dec(signed char * inbuf, FILE *sf1, FILE *sf2);
 
 /* serialise and deserialise shares <-> files */

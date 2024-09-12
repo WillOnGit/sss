@@ -114,6 +114,7 @@ int main(int argc, char **argv)
 
 		/* open files */
 		FILE *infile, *sf1, *sf2, *sf3;
+		FILE *outfiles[3];
 
 		if (!strcmp(n1, "-")) {
 			infile = stdin;
@@ -161,7 +162,11 @@ int main(int argc, char **argv)
 			sbuf[i] = c;
 		}
 
-		return sss_enc(sbuf, sf1, sf2, sf3);
+		outfiles[0] = sf1;
+		outfiles[1] = sf2;
+		outfiles[2] = sf3;
+
+		return sss_enc(sbuf, 3, outfiles);
 	} else if (dec) {
 		int result;
 
