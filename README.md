@@ -31,7 +31,7 @@ You can then `make install` as normal.
 Running `make test` will run some basic tests against the library via the `sss` program.
 
 ## Current limitations
-* k=2, n=3 is the only supported scheme
+* k=2 is the only supported scheme with 2 <= n <= 9
 * secrets must be 32 bytes - smaller secrets will be right-padded with zero-bytes
 * only supports an install prefix of `/usr/local`
 * only supported on unix-like OSes

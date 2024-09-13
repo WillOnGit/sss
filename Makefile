@@ -91,4 +91,4 @@ uninstall:
 	sudo rm -f /usr/local/lib/libsss.a /usr/local/lib/libsss.dylib /usr/local/bin/sss
 
 clean:
-	rm -rf $(OBJECTS) .flags libsss.a libsss.dylib share{1,2,3} sss sss.dSYM/
+	rm -rf $(OBJECTS) .flags libsss.a libsss.dylib share* sss sss.dSYM/

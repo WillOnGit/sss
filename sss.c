@@ -1,5 +1,7 @@
-#define	SBUF_SIZE	32
 #define	SSS_VERSION	"2.0dev"
+#define	SBUF_SIZE	32
+#define	MIN_SHARES	2
+#define	MAX_SHARES	9
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,9 +12,9 @@
 
 const char * const sss_version = SSS_VERSION;
 const char * const helptext =
-	"sss - shamir's secret sharing with libsss (by WillOnGit)\n"
+	"sss - Shamir's secret sharing with libsss (by WillOnGit)\n"
 	"\n"
-	"Usage: sss [--encode | -e] [in filename] [out directory]\n"
+	"Usage: sss [--encode | -e] [--shares | -n num] [infile] [outdir]\n"
 	"or:    sss [--decode | -d] [sharefile1 sharefile2]\n"
 	"or:    sss [--version | -v]\n"
 	"or:    sss [--help | -h]\n"
@@ -20,9 +22,10 @@ const char * const helptext =
 	"If none of [--encode | -e] or [--decode | -d] are specified, encoding is\n"
 	"the default operation.\n"
 	"\n"
-	"When encoding shares, the input file defaults to stdin and the out\n"
-	"directory defaults to the working directory. Three shares will be\n"
-	"written to out directory, named share1, share2 and share3.\n"
+	"When encoding shares, the input file defaults to stdin ('-') and the out\n"
+	"directory defaults to the working directory. [--shares | -n] (default 3)\n"
+	"shares will be generated and written to out directory, named share1,\n"
+	"share2, etc.\n"
 	"\n"
 	"When decoding from shares, if no filenames are supplied they will\n"
 	"default to share1 and share2. Supplying only one filename is an error.\n"
@@ -39,6 +42,7 @@ static struct option long_options[] =
 	{"help",    no_argument,       0, 'h'},
 	{"encode",  no_argument,       0, 'e'},
 	{"decode",  no_argument,       0, 'd'},
+	{"shares",  required_argument, 0, 'n'},
 	{0, 0, 0, 0}
 };
 
@@ -55,12 +59,13 @@ static struct option long_options[] =
  */
 int main(int argc, char **argv)
 {
-	int enc, dec, opt, opt_index;
+	int enc, dec, n, opt, opt_index;
 	char *n1, *n2;
 	signed char sbuf[SBUF_SIZE] = { 0 };
 
 	enc = 1;
 	dec = 0;
+	n = 3;
 
 	n1 = n2 = NULL;
 
@@ -70,7 +75,7 @@ int main(int argc, char **argv)
 	while (1) {
 		/* get option */
 		opt_index = 0;
-		opt = getopt_long (argc, argv, "vhed",
+		opt = getopt_long (argc, argv, "vhedn:",
 				long_options, &opt_index);
 
 		if (opt == -1)
@@ -88,21 +93,27 @@ int main(int argc, char **argv)
 			printf("%s", helptext);
 			return 0;
 		case 'e':
-			/* changeme */
 			enc = 1;
 			dec = 0;
 			break;
 		case 'd':
-			/* changeme */
 			dec = 1;
 			enc = 0;
 			break;
+		case 'n':
+			n = strtol(optarg, NULL, 10);
+
+			/* handle parsing errors and invalid values together */
+			if (n < MIN_SHARES || n > MAX_SHARES) {
+				fprintf(stderr, "number of shares to generate must be between %d and %d, inclusive\n", MIN_SHARES, MAX_SHARES);
+				return 1;
+			}
+			break;
 		case '?':
 			/* getopt_long already printed an error message */
-			break;
+			printf("%s", helptext);
 		default:
-			printf("Hmm\n");
-			abort();
+			return 1;
 		}
 	}
 
@@ -140,8 +151,8 @@ int main(int argc, char **argv)
 		}
 
 		/* open files */
-		FILE *infile, *sf1, *sf2, *sf3;
-		FILE *outfiles[3];
+		FILE *infile, *sharef;
+		FILE *outfiles[n];
 
 		if (!strcmp(n1, "-")) {
 			infile = stdin;
@@ -153,7 +164,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-		/* construct share filenames */
+		/* construct share filenames - only valid with MAX_SHARES <= 9 */
 		sp = strlen(n2);
 		outf = malloc(sp + 8);
 		if (outf == NULL)
@@ -166,19 +177,19 @@ int main(int argc, char **argv)
 
 		strcpy(&outf[sp], "share0");
 		sp += 6;
-		outf[sp] = '\0';
+		outf[sp--] = '\0';
 
 		/* start */
-		outf[sp - 1] = '1';
-		sf1 = fopen(outf, "w");
-		outf[sp - 1] = '2';
-		sf2 = fopen(outf, "w");
-		outf[sp - 1] = '3';
-		sf3 = fopen(outf, "w");
+		for (int i = 0; i < n; i++) {
+			outf[sp] = '1' + i;// dubious, but very K&R
+			sharef = fopen(outf, "w");
 
-		if (sf1 == NULL || sf2 == NULL || sf3 == NULL) {
-			fprintf(stderr, "Unable to open some files\n");
-			return 1;
+			if (sharef == NULL) {
+				fprintf(stderr, "Unable to open %s for writing\n", outf);
+				return 1;
+			}
+
+			outfiles[i] = sharef;
 		}
 
 		/* fill the buffer and create shares */
@@ -189,11 +200,7 @@ int main(int argc, char **argv)
 			sbuf[i] = c;
 		}
 
-		outfiles[0] = sf1;
-		outfiles[1] = sf2;
-		outfiles[2] = sf3;
-
-		return sss_enc(sbuf, 3, outfiles);
+		return sss_enc(sbuf, n, outfiles);
 	} else if (dec) {
 		int result;
 
