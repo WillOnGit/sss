@@ -202,8 +202,8 @@ int main(int argc, char **argv)
 			n1 = "share1";
 			n2 = "share2";
 		} else if (n1 == NULL || n2 == NULL) {
-		    fprintf(stderr, "Please supply two shares\n");
-		    return 1;
+			fprintf(stderr, "Please supply two shares\n");
+			return 1;
 		}
 
 		FILE *sf1, *sf2;
