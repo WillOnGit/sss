@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <getopt.h>
 
 #include "libsss.h"
 
@@ -32,6 +33,15 @@ const char * const helptext =
 	"[--help | -h] prints this message then exits.\n"
 	;
 
+static struct option long_options[] =
+{
+	{"version", no_argument,       0, 'v'},
+	{"help",    no_argument,       0, 'h'},
+	{"encode",  no_argument,       0, 'e'},
+	{"decode",  no_argument,       0, 'd'},
+	{0, 0, 0, 0}
+};
+
 /*
  * basic wrapper around libsss encoding & decoding
  *
@@ -45,7 +55,7 @@ const char * const helptext =
  */
 int main(int argc, char **argv)
 {
-	int enc, dec;
+	int enc, dec, opt, opt_index;
 	char *n1, *n2;
 	signed char sbuf[SBUF_SIZE] = { 0 };
 
@@ -56,43 +66,60 @@ int main(int argc, char **argv)
 
 	/*
 	 * handle arguments
-	 *
-	 * TODO: deal with files named '-e' '-d' or '-v'
 	 */
-	for (int i = 1; i < argc; i++) {
-		if (!strcmp("-v", argv[i]) || !strcmp("--version", argv[i])) {
+	while (1) {
+		/* get option */
+		opt_index = 0;
+		opt = getopt_long (argc, argv, "vhed",
+				long_options, &opt_index);
+
+		if (opt == -1)
+			/* no more options */
+			break;
+
+		/* handle an option */
+		switch (opt) {
+		case 'v':
 			/* emit version info and exit immediately */
 			printf("sss version: %s\nlibsss version: %s\n", sss_version, libsss_version);
 			return 0;
-		}
-
-		if (!strcmp("-h", argv[i]) || !strcmp("--help", argv[i])) {
+		case 'h':
 			/* emit help text and exit immediately */
 			printf("%s", helptext);
 			return 0;
-		}
-
-		if (!strcmp("-d", argv[i]) || !strcmp("--decode", argv[i])) {
-			dec = 1;
-			enc = 0;
-			continue;
-		}
-
-		if (!strcmp("-e", argv[i]) || !strcmp("--encode", argv[i])) {
+		case 'e':
+			/* changeme */
 			enc = 1;
 			dec = 0;
-			continue;
-		}
-
-		/* pick up anything else as a file/directory argument, ignoring any beyond the first 2 */
-		if (n1 == NULL) {
-			n1 = argv[i];
-		} else if (n2 == NULL) {
-			n2 = argv[i];
+			break;
+		case 'd':
+			/* changeme */
+			dec = 1;
+			enc = 0;
+			break;
+		case '?':
+			/* getopt_long already printed an error message */
+			break;
+		default:
+			printf("Hmm\n");
+			abort();
 		}
 	}
 
-	/* options parsed, call relevant lib function */
+	/* assign any remaining args */
+	switch (argc - optind) {
+	case 2:
+		n1 = argv[optind++];
+		n2 = argv[optind];
+		break;
+	case 1:
+		n1 = argv[optind];
+		break;
+	default:
+		;
+	}
+
+	/* options parsed, call relevant lib function with args */
 	if (enc) {
 		int c, sp;
 		char *outf;
