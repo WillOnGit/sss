@@ -208,39 +208,20 @@ int sss_enc(const signed char * const inbuf, int n, FILE* sf[])
 }
 
 /*
- * reconstruct secret from shares in above scheme.
- * shares are read from files and must be entered with
- * "(", "," and ")" characters; whitespace is ignored.
+ * reconstruct a secret from a set of coordinates
  *
- * return codes:
- *     - 0: success
- *     - 1: corrupt input share
- *     - 2: duplicated shares/x coordinates
+ * if shares with repeated x coordinates are given, probably just junk
+ * data will come back but at worst there may be UB.
  */
-int sss_dec(signed char * inbuf, FILE *sf1, FILE *sf2)
+void sss_rec(signed char * inbuf, struct sss_share *share1, struct sss_share *share2)
 {
-	struct sss_share *share1, *share2;
 	mpz_t x_diff, y_diff, p;
-
-	share1 = sss_des(sf1);
-	share2 = sss_des(sf2);
-
-	if (share1 == NULL || share2 == NULL) {
-		return 1;
-	}
 
 	mpz_inits(x_diff, y_diff, NULL);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 
-	if (! (mpz_cmp(share1->x, share2->x) && mpz_cmp(share1->y, share2->y)) ){
-		return 2;
-	}
-
 	/*
-	 * we have well-defined distinct points
-	 * and 0 <= x1, x2, y1, y2 < p
-	 *
-	 * the coefficient of x "a" in q(x) can be recovered as follows:
+	 * when k=2, the coefficient of x "a" in q(x) can be recovered as follows:
 	 *
 	 * (y2 - y1) * (x2 - x1)^-1 ~= a	mod p
 	 */
@@ -255,6 +236,34 @@ int sss_dec(signed char * inbuf, FILE *sf1, FILE *sf2)
 	mpz_mod(x_diff, x_diff, p);
 
 	mpz_export(inbuf, NULL, -1, sizeof(char), 0, 0, x_diff);
+}
 
+/*
+ * reconstruct secret from share files with k = 2.
+ *
+ * return values:
+ *     - 0: success
+ *     - 1: corrupt input share
+ *     - 2: duplicated shares/x coordinates
+ */
+int sss_dec(signed char * inbuf, FILE *sf1, FILE *sf2)
+{
+	struct sss_share *share1, *share2;
+
+	share1 = sss_des(sf1);
+	share2 = sss_des(sf2);
+
+	/* check for well-formed points */
+	if (share1 == NULL || share2 == NULL) {
+		return 1;
+	}
+
+	/* check for duplicate coordinates */
+	if (! (mpz_cmp(share1->x, share2->x) && mpz_cmp(share1->y, share2->y)) ){
+		return 2;
+	}
+
+	/* everything OK, proceed */
+	sss_rec(inbuf, share1, share2);
 	return 0;
 }
