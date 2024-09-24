@@ -1,13 +1,6 @@
 /* version number */
 const char * const libsss_version;
 
-/* data type */
-struct sss_share;
-
-/* encode and decode secrets <-> shares */
+/* encode and decode secrets <-> share files */
 int sss_enc(const signed char * const inbuf, int n, FILE* sf[]);
-int sss_dec(signed char * inbuf, FILE *sf1, FILE *sf2);
-
-/* serialise and deserialise shares <-> files */
-int sss_ser(const struct sss_share *s, FILE *f);
-struct sss_share *sss_des(FILE *f);
+int sss_dec(signed char * inbuf, int n, FILE *sf[]);

@@ -213,17 +213,17 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		FILE *sf1, *sf2;
+		FILE *sf[2];
 
-		sf1 = fopen(n1, "r");
-		sf2 = fopen(n2, "r");
+		sf[0] = fopen(n1, "r");
+		sf[1] = fopen(n2, "r");
 
-		if (sf1 == NULL || sf2 == NULL) {
+		if (sf[0] == NULL || sf[1] == NULL) {
 			fprintf(stderr, "Unable to open some files\n");
 			return 1;
 		}
 
-		result = sss_dec(sbuf, sf1, sf2);
+		result = sss_dec(sbuf, 2, sf);
 
 		switch (result) {
 		case 0:
