@@ -231,10 +231,10 @@ int main(int argc, char **argv)
 				putchar(sbuf[i]);
 			return 0;
 		case 1:
-			printf("Bad input share\n");
+			fprintf(stderr, "Bad input share\n");
 			return 1;
 		case 2:
-			printf("Duplicated coordinates\n");
+			fprintf(stderr, "Duplicated coordinates\n");
 			return 1;
 		}
 	}
