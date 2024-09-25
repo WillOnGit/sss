@@ -153,35 +153,36 @@ int sss_des(FILE *f, struct sss_share *share)
 }
 
 /*
- * generate shares of input 256-bit secret in (2, n) scheme
- *
+ * generate shares of input 256-bit secret in (k, n) scheme, modulo
  * prime p = 115792089237316195423570985008687907853269984665640564039457584007913129640233
- * q(x) = secret + a1 * x
+ *
+ * return values:
+ *     - 0: success
+ *     - 1: invalid parameters
  */
-int sss_enc(const signed char * const inbuf, int n, FILE* sf[])
+int sss_enc(const signed char * const inbuf, int k, int n, FILE* sf[])
 {
 	gmp_randstate_t *state;
-	mpz_t a1, p, secret;
-	struct sss_share *shares;
+	mpz_t a[k-1], p, x_pow, secret;
+	struct sss_share shares[n];
 
 	/* validation */
-	if (n < 2)
+	if (n < 2 || k < 2 || n < k)
 		return 1;
 
 	/* init */
-	shares = malloc(n * sizeof(struct sss_share));
-	if (shares == NULL)
-		return 1;
-
-	mpz_inits(a1, secret, NULL);
+	mpz_inits(secret, x_pow, NULL);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 	state = getstate();
 
 	/* 0 <= secret < p */
 	mpz_import(secret, SBUF_SIZE, -1, sizeof(char), 0, 0, inbuf);
 
-	/* generate coefficient */
-	mpz_urandomm(a1, *state, p);
+	/* generate coefficients */
+	for (int i = 0; i < k - 1; i++) {
+		mpz_init(a[i]);
+		mpz_urandomm(a[i], *state, p);
+	}
 
 	for (int i = 0; i < n; i++) {
 		/*
@@ -191,14 +192,23 @@ int sss_enc(const signed char * const inbuf, int n, FILE* sf[])
 		 */
 		mpz_init(shares[i].x);
 		mpz_urandomm(shares[i].x, *state, p);
+		mpz_init_set_ui(x_pow, 1);
 
 		/* calculate y coordinate */
 		mpz_init_set(shares[i].y, secret);
 
-		mpz_addmul(shares[i].y, a1, shares[i].x);
-		mpz_mod(shares[i].y, shares[i].y, p);
+		/* could probably optimise the first iteration but cba */
+		for (int j = 0; j < k - 1; j++) {
+			/* next power of x */
+			mpz_mul(x_pow, x_pow, shares[i].x);
+			mpz_mod(x_pow, x_pow, p);
 
-		/* everything was OK, so write shares and return */
+			/* multiply by coefficient and add to y */
+			mpz_addmul(shares[i].y, a[j], x_pow);
+			mpz_mod(shares[i].y, shares[i].y, p);
+		}
+
+		/* everything was OK; write share */
 		sss_ser(&shares[i], sf[i]);
 	}
 

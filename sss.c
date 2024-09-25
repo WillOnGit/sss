@@ -2,6 +2,8 @@
 #define	SBUF_SIZE	32
 #define	MIN_SHARES	2
 #define	MAX_SHARES	9
+#define	MIN_THRESHOLD	2
+#define	MAX_THRESHOLD	3
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +16,9 @@ const char * const sss_version = SSS_VERSION;
 const char * const helptext =
 	"sss - Shamir's secret sharing with libsss (by WillOnGit)\n"
 	"\n"
-	"Usage: sss [--encode | -e] [--shares | -n num] [infile] [outdir]\n"
+	"Usage: sss [--encode | -e] [--threshold | -k num] [--shares | -n num]\n"
+	"           [infile] [outdir]\n"
+	"\n"
 	"or:    sss [--decode | -d] [sharefile1 sharefile2]\n"
 	"or:    sss [--version | -v]\n"
 	"or:    sss [--help | -h]\n"
@@ -38,11 +42,12 @@ const char * const helptext =
 
 static struct option long_options[] =
 {
-	{"version", no_argument,       0, 'v'},
-	{"help",    no_argument,       0, 'h'},
-	{"encode",  no_argument,       0, 'e'},
-	{"decode",  no_argument,       0, 'd'},
-	{"shares",  required_argument, 0, 'n'},
+	{"version",    no_argument,       0, 'v'},
+	{"help",       no_argument,       0, 'h'},
+	{"encode",     no_argument,       0, 'e'},
+	{"decode",     no_argument,       0, 'd'},
+	{"shares",     required_argument, 0, 'n'},
+	{"threshold",  required_argument, 0, 'k'},
 	{0, 0, 0, 0}
 };
 
@@ -59,13 +64,14 @@ static struct option long_options[] =
  */
 int main(int argc, char **argv)
 {
-	int enc, dec, n, opt, opt_index;
+	int enc, dec, n, k, opt, opt_index;
 	char *n1, *n2;
 	signed char sbuf[SBUF_SIZE] = { 0 };
 
 	enc = 1;
 	dec = 0;
 	n = 3;
+	k = 2;
 
 	n1 = n2 = NULL;
 
@@ -75,7 +81,7 @@ int main(int argc, char **argv)
 	while (1) {
 		/* get option */
 		opt_index = 0;
-		opt = getopt_long (argc, argv, "vhedn:",
+		opt = getopt_long (argc, argv, "vhedn:k:",
 				long_options, &opt_index);
 
 		if (opt == -1)
@@ -109,6 +115,15 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			break;
+		case 'k':
+			k = strtol(optarg, NULL, 10);
+
+			/* handle parsing errors and invalid values together */
+			if (k < MIN_THRESHOLD || k > MAX_THRESHOLD) {
+				fprintf(stderr, "share threshold must be between %d and %d, inclusive\n", MIN_THRESHOLD, MAX_THRESHOLD);
+				return 1;
+			}
+			break;
 		case '?':
 			/* getopt_long already printed an error message */
 			printf("%s", helptext);
@@ -134,6 +149,12 @@ int main(int argc, char **argv)
 	if (enc) {
 		int c, sp;
 		char *outf;
+
+		/* check for invalid k, n */
+		if (n < k) {
+			fprintf(stderr, "Number of shares to generate below recovery threshold\n");
+			return 1;
+		}
 
 		/* set defaults if not specified or check for empty strings */
 		if (n1 == NULL) {
@@ -200,7 +221,7 @@ int main(int argc, char **argv)
 			sbuf[i] = c;
 		}
 
-		return sss_enc(sbuf, n, outfiles);
+		return sss_enc(sbuf, k, n, outfiles);
 	} else if (dec) {
 		int result;
 
