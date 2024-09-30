@@ -3,7 +3,7 @@
 #define	MIN_SHARES	2
 #define	MAX_SHARES	9
 #define	MIN_THRESHOLD	2
-#define	MAX_THRESHOLD	3
+#define	MAX_THRESHOLD	9
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,15 +65,12 @@ static struct option long_options[] =
 int main(int argc, char **argv)
 {
 	int enc, dec, n, k, opt, opt_index;
-	char *n1, *n2;
 	signed char sbuf[SBUF_SIZE] = { 0 };
 
 	enc = 1;
 	dec = 0;
 	n = 3;
 	k = 2;
-
-	n1 = n2 = NULL;
 
 	/*
 	 * handle arguments
@@ -132,23 +129,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/* assign any remaining args */
-	switch (argc - optind) {
-	case 2:
-		n1 = argv[optind++];
-		n2 = argv[optind];
-		break;
-	case 1:
-		n1 = argv[optind];
-		break;
-	default:
-		;
-	}
-
 	/* options parsed, call relevant lib function with args */
 	if (enc) {
 		int c, sp;
-		char *outf;
+		char *outf, *sharedir;
+		FILE *infile, *sharef, *outfiles[n];
 
 		/* check for invalid k, n */
 		if (n < k) {
@@ -156,53 +141,49 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		/* set defaults if not specified or check for empty strings */
-		if (n1 == NULL) {
-			n1 = "-";
-		} else if (!strcmp(n1, "")) {
+		/* set input file, with default and empty check */
+		if (argc == optind || !strcmp(argv[optind], "-")) {
+			infile = stdin;
+		} else if (!strcmp(argv[optind], "")) {
 			fprintf(stderr, "Please supply a nonempty input filename\n");
 			return 1;
-		}
-
-		if (n2 == NULL) {
-			n2 = "./";
-		} else if (!strcmp(n2, "")) {
-			fprintf(stderr, "Please supply a nonempty directory name\n");
-			return 1;
-		}
-
-		/* open files */
-		FILE *infile, *sharef;
-		FILE *outfiles[n];
-
-		if (!strcmp(n1, "-")) {
-			infile = stdin;
 		} else {
-			infile = fopen(n1, "r");
+			infile = fopen(argv[optind], "r");
 			if (infile == NULL) {
-				fprintf(stderr, "Unable to open file %s\n", n1);
+				fprintf(stderr, "Unable to open file %s\n", argv[optind]);
 				return 1;
 			}
 		}
 
+		/* set share output directory, with default and empty check */
+		if (argc <= optind + 1) {
+			sharedir = "./";
+			sp = 2;
+		} else if (!strcmp(argv[optind + 1], "")) {
+			fprintf(stderr, "Please supply a nonempty directory name\n");
+			return 1;
+		} else {
+			sharedir = argv[optind + 1];
+			sp = strlen(sharedir);
+		}
+
 		/* construct share filenames - only valid with MAX_SHARES <= 9 */
-		sp = strlen(n2);
 		outf = malloc(sp + 8);
 		if (outf == NULL)
 			return 1;
 
-		memcpy(outf, n2, sp * sizeof(char));
+		memcpy(outf, sharedir, sp * sizeof(char));
 		if (outf[sp - 1] != '/') {
 			outf[sp++] = '/';
 		}
 
 		strcpy(&outf[sp], "share0");
 		sp += 6;
-		outf[sp--] = '\0';
+		outf[sp--] = '\0';/* can probably optimise this out with calloc */
 
 		/* start */
 		for (int i = 0; i < n; i++) {
-			outf[sp] = '1' + i;// dubious, but very K&R
+			outf[sp] = '1' + i;/* dubious, but very K&R */
 			sharef = fopen(outf, "w");
 
 			if (sharef == NULL) {
@@ -223,28 +204,53 @@ int main(int argc, char **argv)
 
 		return sss_enc(sbuf, k, n, outfiles);
 	} else if (dec) {
-		int result;
+		int result, args, shares;
+		FILE **sharefiles;
 
-		/* set defaults only if nothing specified */
-		if (n1 == NULL && n2 == NULL) {
-			n1 = "share1";
-			n2 = "share2";
-		} else if (n1 == NULL || n2 == NULL) {
-			fprintf(stderr, "Please supply two shares\n");
+		args = argc - optind;
+
+		/*
+		 * set defaults only if nothing specified
+		 *
+		 * ALSO only valid if MAX_SHARES <= 9
+		 */
+		if (args == 0) {
+			shares = 2;
+
+			sharefiles = malloc(shares * sizeof(FILE*));
+			if (sharefiles == NULL) {
+				fprintf(stderr, "Unable to allocate shares\n");
+				return 1;
+			}
+
+			sharefiles[0] = fopen("share1", "r");
+			sharefiles[1] = fopen("share2", "r");
+			if (sharefiles[0] == NULL || sharefiles[1] == NULL) {
+				fprintf(stderr, "Unable to open some files\n");
+				return 1;
+			}
+		} else if (args == 1) {
+			fprintf(stderr, "Please supply at least two shares\n");
 			return 1;
+		} else {
+			shares = args;
+
+			sharefiles = malloc(shares * sizeof(FILE*));
+			if (sharefiles == NULL) {
+				fprintf(stderr, "Unable to allocate shares\n");
+				return 1;
+			}
+
+			for (int i = 0; i < args; i++) {
+				sharefiles[i] = fopen(argv[optind++], "r");
+				if (sharefiles[i] == NULL) {
+					fprintf(stderr, "Unable to open file %s\n", argv[optind]);
+					return 1;
+				}
+			}
 		}
 
-		FILE *sf[2];
-
-		sf[0] = fopen(n1, "r");
-		sf[1] = fopen(n2, "r");
-
-		if (sf[0] == NULL || sf[1] == NULL) {
-			fprintf(stderr, "Unable to open some files\n");
-			return 1;
-		}
-
-		result = sss_dec(sbuf, 2, sf);
+		result = sss_dec(sbuf, shares, sharefiles);
 
 		switch (result) {
 		case 0:
@@ -256,6 +262,12 @@ int main(int argc, char **argv)
 			return 1;
 		case 2:
 			fprintf(stderr, "Duplicated coordinates\n");
+			return 1;
+		case 3:
+			fprintf(stderr, "Invalid k\n");
+			return 1;
+		default:
+			fprintf(stderr, "An unknown error occurred decoding the secret\n");
 			return 1;
 		}
 	}

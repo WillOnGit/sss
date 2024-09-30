@@ -216,37 +216,46 @@ int sss_enc(const signed char * const inbuf, int k, int n, FILE* sf[])
 }
 
 /*
- * reconstruct a secret from a set of coordinates
+ * reconstruct a secret from a set of unique coordinates
  *
  * if shares with repeated x coordinates are given, probably just junk
  * data will come back but at worst there may be UB.
  */
 void sss_rec(signed char * inbuf, int k, const struct sss_share shares[])
 {
-	mpz_t x_diff, y_diff, p;
+	mpz_t secret_sum, inner_prod, inner_term, p;
 
-	if (k != 2)
+	/* don't modify inbuf on invalid k */
+	if (k < 2)
 		return;
 
-	mpz_inits(x_diff, y_diff, NULL);
+	/* init */
+	mpz_inits(inner_prod, inner_term, NULL);
+	mpz_init_set_ui(secret_sum, 0);
 	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
 
-	/*
-	 * when k=2, the coefficient of x "a" in q(x) can be recovered as follows:
-	 *
-	 * (y2 - y1) * (x2 - x1)^-1 ~= a	mod p
-	 */
-	mpz_sub(y_diff, shares[1].y, shares[0].y);
-	mpz_sub(x_diff, shares[1].x, shares[0].x);
+	/* recover secret by directly evaluating k-order Lagrange polynomial at 0 */
+	for (int outer = 0; outer < k; outer++) {
+		mpz_set_ui(inner_prod, 1);
 
-	mpz_invert(x_diff, x_diff, p);
-	mpz_mul(y_diff, y_diff, x_diff);/* y_diff = a1 */
+		/* calculate next product term and multiply into inner_prod */
+		for (int inner = 0; inner < k; inner++) {
+			if (inner == outer)
+				continue;
 
-	mpz_set(x_diff, shares[0].y);
-	mpz_submul(x_diff, shares[0].x, y_diff);
-	mpz_mod(x_diff, x_diff, p);
+			mpz_sub(inner_term, shares[inner].x, shares[outer].x);
+			mpz_invert(inner_term, inner_term, p);/* no need for mpz_mod before or after mpz_invert() */
+			mpz_mul(inner_term, inner_term, shares[inner].x);
 
-	mpz_export(inbuf, NULL, -1, sizeof(char), 0, 0, x_diff);
+			mpz_mul(inner_prod, inner_prod, inner_term);
+		}
+
+		mpz_addmul(secret_sum, shares[outer].y, inner_prod);
+	}
+
+	/* ensure 0 <= secret < p and write to buffer */
+	mpz_mod(secret_sum, secret_sum, p);
+	mpz_export(inbuf, NULL, -1, sizeof(char), 0, 0, secret_sum);
 }
 
 /*
@@ -256,17 +265,17 @@ void sss_rec(signed char * inbuf, int k, const struct sss_share shares[])
  *     - 0: success
  *     - 1: corrupt input share
  *     - 2: duplicated shares/x coordinates
- *     - 3: not yet implemented
+ *     - 3: bad inputs
  */
 int sss_dec(signed char * inbuf, int n, FILE *sf[])
 {
 	struct sss_share shares[n];
 
-	if (n != 2)
+	if (n < 2)
 		return 3;
 
 	/* try to get a valid, unique share from each input file */
-	for (int i = 0; i < 2; i++) {
+	for (int i = 0; i < n; i++) {
 		int failed;
 		failed = sss_des(sf[i], &shares[i]);
 
