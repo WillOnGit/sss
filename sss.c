@@ -1,9 +1,9 @@
-#define	SSS_VERSION	"2.0dev"
-#define	SBUF_SIZE	32
-#define	MIN_SHARES	2
-#define	MAX_SHARES	9
-#define	MIN_THRESHOLD	2
-#define	MAX_THRESHOLD	9
+#define SSS_VERSION   "2.0dev"
+#define SBUF_SIZE     32
+#define MIN_SHARES    2
+#define MAX_SHARES    9
+#define MIN_THRESHOLD 2
+#define MAX_THRESHOLD 9
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,8 +12,8 @@
 
 #include "libsss.h"
 
-const char * const sss_version = SSS_VERSION;
-const char * const helptext =
+const char *const sss_version = SSS_VERSION;
+const char *const helptext =
 	"sss - Shamir's secret sharing with libsss (by WillOnGit)\n"
 	"\n"
 	"Usage: sss [--encode | -e] [--threshold | -k num] [--shares | -n num]\n"
@@ -37,18 +37,16 @@ const char * const helptext =
 	"\n"
 	"[--version | -v] prints the program and library versions then exits.\n"
 	"\n"
-	"[--help | -h] prints this message then exits.\n"
-	;
+	"[--help | -h] prints this message then exits.\n";
 
-static struct option long_options[] =
-{
-	{"version",    no_argument,       0, 'v'},
-	{"help",       no_argument,       0, 'h'},
-	{"encode",     no_argument,       0, 'e'},
-	{"decode",     no_argument,       0, 'd'},
-	{"shares",     required_argument, 0, 'n'},
-	{"threshold",  required_argument, 0, 'k'},
-	{0, 0, 0, 0}
+static struct option long_options[] = {
+	{ "version",   no_argument,       0, 'v' },
+	{ "help",      no_argument,       0, 'h' },
+	{ "encode",    no_argument,       0, 'e' },
+	{ "decode",    no_argument,       0, 'd' },
+	{ "shares",    required_argument, 0, 'n' },
+	{ "threshold", required_argument, 0, 'k' },
+	{ 0,           0,                 0, 0   }
 };
 
 /*
@@ -78,8 +76,8 @@ int main(int argc, char **argv)
 	while (1) {
 		/* get option */
 		opt_index = 0;
-		opt = getopt_long (argc, argv, "vhedn:k:",
-				long_options, &opt_index);
+		opt = getopt_long(argc, argv, "vhedn:k:", long_options,
+		                  &opt_index);
 
 		if (opt == -1)
 			/* no more options */
@@ -89,7 +87,8 @@ int main(int argc, char **argv)
 		switch (opt) {
 		case 'v':
 			/* emit version info and exit immediately */
-			printf("sss version: %s\nlibsss version: %s\n", sss_version, libsss_version);
+			printf("sss version: %s\nlibsss version: %s\n",
+			       sss_version, libsss_version);
 			return 0;
 		case 'h':
 			/* emit help text and exit immediately */
@@ -108,7 +107,9 @@ int main(int argc, char **argv)
 
 			/* handle parsing errors and invalid values together */
 			if (n < MIN_SHARES || n > MAX_SHARES) {
-				fprintf(stderr, "number of shares to generate must be between %d and %d, inclusive\n", MIN_SHARES, MAX_SHARES);
+				fprintf(stderr,
+				        "number of shares to generate must be between %d and %d, inclusive\n",
+				        MIN_SHARES, MAX_SHARES);
 				return 1;
 			}
 			break;
@@ -117,7 +118,9 @@ int main(int argc, char **argv)
 
 			/* handle parsing errors and invalid values together */
 			if (k < MIN_THRESHOLD || k > MAX_THRESHOLD) {
-				fprintf(stderr, "share threshold must be between %d and %d, inclusive\n", MIN_THRESHOLD, MAX_THRESHOLD);
+				fprintf(stderr,
+				        "share threshold must be between %d and %d, inclusive\n",
+				        MIN_THRESHOLD, MAX_THRESHOLD);
 				return 1;
 			}
 			break;
@@ -137,7 +140,8 @@ int main(int argc, char **argv)
 
 		/* check for invalid k, n */
 		if (n < k) {
-			fprintf(stderr, "Number of shares to generate below recovery threshold\n");
+			fprintf(stderr,
+			        "Number of shares to generate below recovery threshold\n");
 			return 1;
 		}
 
@@ -145,12 +149,15 @@ int main(int argc, char **argv)
 		if (argc == optind || !strcmp(argv[optind], "-")) {
 			infile = stdin;
 		} else if (!strcmp(argv[optind], "")) {
-			fprintf(stderr, "Please supply a nonempty input filename\n");
+			fprintf(stderr,
+			        "Please supply a nonempty input filename\n");
 			return 1;
 		} else {
 			infile = fopen(argv[optind], "r");
 			if (infile == NULL) {
-				fprintf(stderr, "Unable to open file %s\n", argv[optind]);
+				fprintf(stderr,
+				        "Unable to open file %s\n",
+				        argv[optind]);
 				return 1;
 			}
 		}
@@ -160,7 +167,8 @@ int main(int argc, char **argv)
 			sharedir = "./";
 			sp = 2;
 		} else if (!strcmp(argv[optind + 1], "")) {
-			fprintf(stderr, "Please supply a nonempty directory name\n");
+			fprintf(stderr,
+			        "Please supply a nonempty directory name\n");
 			return 1;
 		} else {
 			sharedir = argv[optind + 1];
@@ -179,15 +187,18 @@ int main(int argc, char **argv)
 
 		strcpy(&outf[sp], "share0");
 		sp += 6;
-		outf[sp--] = '\0';/* can probably optimise this out with calloc */
+		outf[sp--] =
+			'\0'; /* can probably optimise this out with calloc */
 
 		/* start */
 		for (int i = 0; i < n; i++) {
-			outf[sp] = '1' + i;/* dubious, but very K&R */
+			outf[sp] = '1' + i; /* dubious, but very K&R */
 			sharef = fopen(outf, "w");
 
 			if (sharef == NULL) {
-				fprintf(stderr, "Unable to open %s for writing\n", outf);
+				fprintf(stderr,
+				        "Unable to open %s for writing\n",
+				        outf);
 				return 1;
 			}
 
@@ -217,34 +228,42 @@ int main(int argc, char **argv)
 		if (args == 0) {
 			shares = 2;
 
-			sharefiles = malloc(shares * sizeof(FILE*));
+			sharefiles = malloc(shares * sizeof(FILE *));
 			if (sharefiles == NULL) {
-				fprintf(stderr, "Unable to allocate shares\n");
+				fprintf(stderr,
+				        "Unable to allocate shares\n");
 				return 1;
 			}
 
 			sharefiles[0] = fopen("share1", "r");
 			sharefiles[1] = fopen("share2", "r");
-			if (sharefiles[0] == NULL || sharefiles[1] == NULL) {
-				fprintf(stderr, "Unable to open some files\n");
+			if (sharefiles[0] == NULL ||
+			    sharefiles[1] == NULL) {
+				fprintf(stderr,
+				        "Unable to open some files\n");
 				return 1;
 			}
 		} else if (args == 1) {
-			fprintf(stderr, "Please supply at least two shares\n");
+			fprintf(stderr,
+			        "Please supply at least two shares\n");
 			return 1;
 		} else {
 			shares = args;
 
-			sharefiles = malloc(shares * sizeof(FILE*));
+			sharefiles = malloc(shares * sizeof(FILE *));
 			if (sharefiles == NULL) {
-				fprintf(stderr, "Unable to allocate shares\n");
+				fprintf(stderr,
+				        "Unable to allocate shares\n");
 				return 1;
 			}
 
 			for (int i = 0; i < args; i++) {
-				sharefiles[i] = fopen(argv[optind++], "r");
+				sharefiles[i] =
+					fopen(argv[optind++], "r");
 				if (sharefiles[i] == NULL) {
-					fprintf(stderr, "Unable to open file %s\n", argv[optind]);
+					fprintf(stderr,
+					        "Unable to open file %s\n",
+					        argv[optind]);
 					return 1;
 				}
 			}
@@ -267,7 +286,8 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Invalid k\n");
 			return 1;
 		default:
-			fprintf(stderr, "An unknown error occurred decoding the secret\n");
+			fprintf(stderr,
+			        "An unknown error occurred decoding the secret\n");
 			return 1;
 		}
 	}

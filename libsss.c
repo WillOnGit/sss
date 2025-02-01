@@ -1,7 +1,7 @@
-#define	SBUF_SIZE	32
-#define	LIBSSS_VERSION	"2.0dev"
-#define	X_STR(x)	#x
-#define	STR(x)	X_STR(x)
+#define SBUF_SIZE      32
+#define LIBSSS_VERSION "2.0dev"
+#define X_STR(x)       #x
+#define STR(x)         X_STR(x)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,17 +10,11 @@
 
 #include "libsss.h"
 
-const char * const libsss_version = LIBSSS_VERSION
-	"\ngmp version: "
-	STR(__GNU_MP_VERSION)
-	"."
-	STR(__GNU_MP_VERSION_MINOR)
-	"."
-	STR(__GNU_MP_VERSION_PATCHLEVEL)
-	;
+const char *const libsss_version = LIBSSS_VERSION
+	"\ngmp version: " STR(__GNU_MP_VERSION) "." STR(
+		__GNU_MP_VERSION_MINOR) "." STR(__GNU_MP_VERSION_PATCHLEVEL);
 
-struct sss_share
-{
+struct sss_share {
 	mpz_t x;
 	mpz_t y;
 };
@@ -43,7 +37,8 @@ gmp_randstate_t *getstate()
 		FILE *urandom = fopen("/dev/urandom", "r");
 
 		if (urandom == NULL) {
-			fprintf(stderr, "Can't open /dev/urandom!\nOutput shares will be unsafe.\n");
+			fprintf(stderr,
+			        "Can't open /dev/urandom!\nOutput shares will be unsafe.\n");
 		} else {
 			/*
 			 * TODO: improve this random seeding
@@ -88,8 +83,8 @@ gmp_randstate_t *getstate()
  */
 int sss_ser(const struct sss_share *s, FILE *f)
 {
-	signed char xbytes[SBUF_SIZE] = {0};
-	signed char ybytes[SBUF_SIZE] = {0};
+	signed char xbytes[SBUF_SIZE] = { 0 };
+	signed char ybytes[SBUF_SIZE] = { 0 };
 
 	/*
 	 * TODO: bounds checking
@@ -160,10 +155,10 @@ int sss_des(FILE *f, struct sss_share *share)
  *     - 0: success
  *     - 1: invalid parameters
  */
-int sss_enc(const signed char * const inbuf, int k, int n, FILE* sf[])
+int sss_enc(const signed char *const inbuf, int k, int n, FILE *sf[])
 {
 	gmp_randstate_t *state;
-	mpz_t a[k-1], p, x_pow, secret;
+	mpz_t a[k - 1], p, x_pow, secret;
 	struct sss_share shares[n];
 
 	/* validation */
@@ -172,7 +167,10 @@ int sss_enc(const signed char * const inbuf, int k, int n, FILE* sf[])
 
 	/* init */
 	mpz_inits(secret, x_pow, NULL);
-	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
+	mpz_init_set_str(
+		p,
+		"115792089237316195423570985008687907853269984665640564039457584007913129640233",
+		10);
 	state = getstate();
 
 	/* 0 <= secret < p */
@@ -221,7 +219,7 @@ int sss_enc(const signed char * const inbuf, int k, int n, FILE* sf[])
  * if shares with repeated x coordinates are given, probably just junk
  * data will come back but at worst there may be UB.
  */
-void sss_rec(signed char * inbuf, int k, const struct sss_share shares[])
+void sss_rec(signed char *inbuf, int k, const struct sss_share shares[])
 {
 	mpz_t secret_sum, inner_prod, inner_term, p;
 
@@ -232,7 +230,10 @@ void sss_rec(signed char * inbuf, int k, const struct sss_share shares[])
 	/* init */
 	mpz_inits(inner_prod, inner_term, NULL);
 	mpz_init_set_ui(secret_sum, 0);
-	mpz_init_set_str(p, "115792089237316195423570985008687907853269984665640564039457584007913129640233", 10);
+	mpz_init_set_str(
+		p,
+		"115792089237316195423570985008687907853269984665640564039457584007913129640233",
+		10);
 
 	/* recover secret by directly evaluating k-order Lagrange polynomial at 0 */
 	for (int outer = 0; outer < k; outer++) {
@@ -243,8 +244,11 @@ void sss_rec(signed char * inbuf, int k, const struct sss_share shares[])
 			if (inner == outer)
 				continue;
 
-			mpz_sub(inner_term, shares[inner].x, shares[outer].x);
-			mpz_invert(inner_term, inner_term, p);/* no need for mpz_mod before or after mpz_invert() */
+			mpz_sub(inner_term, shares[inner].x,
+			        shares[outer].x);
+			mpz_invert(
+				inner_term, inner_term,
+				p); /* no need for mpz_mod before or after mpz_invert() */
 			mpz_mul(inner_term, inner_term, shares[inner].x);
 
 			mpz_mul(inner_prod, inner_prod, inner_term);
@@ -267,7 +271,7 @@ void sss_rec(signed char * inbuf, int k, const struct sss_share shares[])
  *     - 2: duplicated shares/x coordinates
  *     - 3: bad inputs
  */
-int sss_dec(signed char * inbuf, int n, FILE *sf[])
+int sss_dec(signed char *inbuf, int n, FILE *sf[])
 {
 	struct sss_share shares[n];
 
@@ -286,7 +290,7 @@ int sss_dec(signed char * inbuf, int n, FILE *sf[])
 
 		/* check for duplicate coordinates */
 		for (int j = 0; j < i; j++) {
-			if (!mpz_cmp(shares[i].x, shares[j].x)){
+			if (!mpz_cmp(shares[i].x, shares[j].x)) {
 				return 2;
 			}
 		}

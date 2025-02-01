@@ -40,3 +40,4 @@ Running `make test` will run some basic tests against the library via the `sss` 
 * C compiler and `make`
 * [The GNU Multiple Precision Arithmetic Library](https://gmplib.org/) - tested with version 6.3.0
 * `xxd` - for tests only
+* `clang-format` - for formatting only

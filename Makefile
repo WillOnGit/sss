@@ -1,4 +1,4 @@
-.PHONY: all clean debug install lastflags mac release test uninstall
+.PHONY: all clean debug fmt install lastflags mac release test uninstall
 .SILENT: lastflags test
 
 # variables
@@ -89,6 +89,9 @@ install: all
 
 uninstall:
 	sudo rm -f /usr/local/lib/libsss.a /usr/local/lib/libsss.dylib /usr/local/bin/sss
+
+fmt:
+	clang-format -i *.c *.h
 
 clean:
 	rm -rf $(OBJECTS) .flags libsss.a libsss.dylib share* sss sss.dSYM/
